@@ -1,6 +1,5 @@
-
 class UsersController < ApplicationController
-  before_action :user_params, only: [:create, :update]
+  before_action :user_params, only: [:create, :update, :update_profile]
   before_action :set_user, only: [:edit, :update, :update_profile]
   before_action :authenticate_user!, only: [:edit, :update, :update_profile]
 
@@ -57,14 +56,14 @@ class UsersController < ApplicationController
 
   def update_profile
     unless params[:id].to_s.match?(/\A[0-9]+\z/)
-      return render json: { error: 'Invalid user ID format.' }, status: :bad_request
+      return render json: { error: 'Wrong format.' }, status: :bad_request
     end
 
     return render json: { error: 'User not found.' }, status: :not_found unless @user
-    return render json: { error: 'Unauthorized' }, status: :unauthorized unless current_user_can_edit?(@user)
+    return render json: { error: 'Forbidden' }, status: :forbidden unless current_user_can_edit?(@user)
 
     if @user.update(user_params)
-      render json: { status: 200, user: @user.as_json(only: [:id, :name, :email, :bio, :updated_at]) }, status: :ok
+      render json: { status: 200, user: @user.as_json(only: [:id, :name, :email, :updated_at]) }, status: :ok
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
     end
@@ -72,12 +71,11 @@ class UsersController < ApplicationController
 
   private
 
-  # Update user_params to include email, password, and password_confirmation for the update action
   def user_params
     if action_name == 'create'
       params.require(:user).permit(:name, :email, :password, :password_confirmation)
     elsif action_name == 'update_profile'
-      params.require(:user).permit(:name, :email, :bio)
+      params.require(:user).permit(:name, :email)
     elsif action_name == 'update'
       params.require(:user).permit(:name, :email, :password, :password_confirmation)
     else
@@ -93,7 +91,6 @@ class UsersController < ApplicationController
     # Authentication logic goes here
   end
 
-  # Use a regex to validate the email format
   def email_valid?(email)
     email =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
   end
@@ -102,11 +99,7 @@ class UsersController < ApplicationController
     user_params[:password] == user_params[:password_confirmation]
   end
 
-  # Check if the current user is allowed to edit the given user's profile
   def current_user_can_edit?(user)
-    # Assuming there is a method to check if the current user is the same as the user being edited
-    # or if the current user has the necessary permissions.
-    # This method needs to be implemented.
     user == current_user || current_user.admin?
   end
 end
