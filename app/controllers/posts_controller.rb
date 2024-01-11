@@ -2,12 +2,10 @@ class PostsController < ApplicationController
   before_action :validate_id_format, only: [:show, :update]
 
   def index
-    page = params[:page] || 1
-    per_page = params[:per_page] || 10
-
-    @posts = Post.includes(:user).page(page).per(per_page)
-    @total_posts = Post.count
-    @total_pages = (@total_posts.to_f / per_page).ceil
+    @posts = Post.select(:id, :title, :content, :created_at, :updated_at, :user_id).all
+    render json: { status: 200, posts: @posts }
+  rescue => e
+    render json: { error: 'Internal Server Error', message: e.message }, status: :internal_server_error
   end
 
   def show
