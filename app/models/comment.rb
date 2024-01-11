@@ -1,11 +1,11 @@
 class Comment < ApplicationRecord
-  # Validations
-  validates :title, :status, presence: true
-  validates :title, length: { minimum: 4 }
-  validates :title, uniqueness: { message: "already taken!!" }
-
-  # Relations
+  # Associations
   belongs_to :user
+  belongs_to :post
 
-  # Add any additional callback methods you need below
+  # Validations
+  validates :title, presence: true, length: { minimum: 4 }, uniqueness: { message: "already taken!!" }
+  validates :status, presence: true
+
+  # Add any additional methods or callback methods you need below
 end
