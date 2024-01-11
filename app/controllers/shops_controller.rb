@@ -1,8 +1,10 @@
+
 class ShopsController < ApplicationController
   before_action :check_user_permission, only: [:update]
 
   def update
     return render json: { error: 'Invalid shop ID format.' }, status: :bad_request unless params[:id].to_s.match?(/\A\d+\z/)
+    return render json: { error: 'Shop name and address cannot be blank.' }, status: :unprocessable_entity unless validate_shop_params
 
     shop = Shop.find_by_id(params[:id])
     if shop.nil?
@@ -10,7 +12,7 @@ class ShopsController < ApplicationController
     end
 
     if shop.update(shop_params)
-      render json: { status: 200, shop: shop.as_json(methods: :updated_at) }, status: :ok
+      render json: { message: 'Shop information updated successfully', shop: shop.as_json(methods: :updated_at) }, status: :ok
     else
       render json: { error: shop.errors.full_messages }, status: :unprocessable_entity
     end
@@ -20,6 +22,10 @@ class ShopsController < ApplicationController
 
   def shop_params
     params.require(:shop).permit(:name, :address, :description)
+  end
+
+  def validate_shop_params
+    params[:shop][:name].present? && params[:shop][:address].present?
   end
 
   def check_user_permission
