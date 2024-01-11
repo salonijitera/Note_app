@@ -1,16 +1,25 @@
 class PostsController < ApplicationController
-  before_action :validate_post_id, only: [:show, :delete]
+  before_action :validate_id_format, only: [:update]
 
   def index
-    @posts = Post.all
+    page = params[:page] || 1
+    per_page = params[:per_page] || 10
+
+    @posts = Post.includes(:user).page(page).per(per_page)
+    @total_posts = Post.count
+    @total_pages = (@total_posts.to_f / per_page).ceil
   end
 
   def show
-    @post = Post.includes(:user).find_by(id: params[:id])
-    if @post
-      render json: { post: @post, user: @post.user }
+    unless params[:id].to_s.match?(/\A\d+\z/)
+      render json: { error: 'Invalid ID format' }, status: :bad_request
     else
-      render json: { error: 'Post not found' }, status: :not_found
+      @post = Post.includes(:user).find_by(id: params[:id])
+      if @post
+        render json: { post: @post, user: @post.user }
+      else
+        render json: { error: 'Post not found' }, status: :not_found
+      end
     end
   end
 
@@ -21,46 +30,31 @@ class PostsController < ApplicationController
   def create
     @post = Post.new(post_params)
     if @post.save
-      redirect_to posts_path, notice: "Post created!!"
+      redirect_to posts_path, :notice => "Post created!!"
     else
       render 'new'
     end
   end
 
   def edit
-    begin
-      post_id = Integer(params[:id])
-    rescue ArgumentError
-      redirect_to posts_path, alert: "Invalid post ID."
-      return
-    end
-
-    @post = Post.find_by(id: post_id)
-
-    if @post.nil?
-      redirect_to posts_path, alert: "Post not found."
-    else
-      # Proceed with the rest of the edit action if @post is present
-    end
+    @post = Post.find(params[:id])
   end
 
   def update
-    @post = Post.find(params[:id])
-    if @post.update_attributes(post_params)
-      redirect_to posts_path, notice: "Post edited!!"
+    @post = Post.find_by_id(params[:id])
+    if @post.nil?
+      render json: { error: 'Post not found' }, status: :not_found
+    elsif @post.update_attributes(post_params)
+      redirect_to posts_path, :notice => "Post edited!!"
     else
-      render 'edit'
+      render json: { errors: @post.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
   def delete
-    @post = Post.find_by(id: params[:id])
-    if @post
-      @post.destroy
-      redirect_to posts_path, notice: "Post deleted!!"
-    else
-      redirect_to posts_path, alert: "Post not found."
-    end
+    @post = Post.find(params[:id])
+    @post.destroy
+    redirect_to posts_path, :notice => "Post deleted!!"
   end
 
   def update_shop
@@ -89,9 +83,9 @@ class PostsController < ApplicationController
     params.require(:post).permit(:title, :content)
   end
 
-  def validate_post_id
-    unless params[:id].to_i.to_s == params[:id]
-      redirect_to posts_path, alert: "Invalid post ID."
+  def validate_id_format
+    unless params[:id].to_s.match?(/\A\d+\z/)
+      render json: { error: 'Invalid ID format' }, status: :bad_request
     end
   end
 
