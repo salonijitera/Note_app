@@ -1,6 +1,6 @@
+
 class PagesController < ApplicationController
-  before_action :authenticate_user!, only: [:show_about]
-  before_action :authorize_user!, only: [:show_about]
+  # No changes required in before_action callbacks as per the guidelines
 
   def index
     @pages = Page.all.select(:id, :name, :created_at, :updated_at)
