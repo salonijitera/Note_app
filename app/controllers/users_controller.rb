@@ -1,5 +1,6 @@
+
 class UsersController < ApplicationController
-  before_action :user_params, only: [:create]
+  before_action :user_params, only: [:create, :update]
   before_action :set_user, only: [:edit, :update, :update_profile]
   before_action :authenticate_user!, only: [:edit, :update, :update_profile]
 
@@ -71,11 +72,16 @@ class UsersController < ApplicationController
 
   private
 
+  # Update user_params to include email, password, and password_confirmation for the update action
   def user_params
     if action_name == 'create'
       params.require(:user).permit(:name, :email, :password, :password_confirmation)
     elsif action_name == 'update_profile'
       params.require(:user).permit(:name, :email, :bio)
+    elsif action_name == 'update'
+      params.require(:user).permit(:name, :email, :password, :password_confirmation)
+    else
+      params.permit(:name, :email, :password, :password_confirmation)
     end
   end
 
@@ -87,6 +93,7 @@ class UsersController < ApplicationController
     # Authentication logic goes here
   end
 
+  # Use a regex to validate the email format
   def email_valid?(email)
     email =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
   end
@@ -95,6 +102,7 @@ class UsersController < ApplicationController
     user_params[:password] == user_params[:password_confirmation]
   end
 
+  # Check if the current user is allowed to edit the given user's profile
   def current_user_can_edit?(user)
     # Assuming there is a method to check if the current user is the same as the user being edited
     # or if the current user has the necessary permissions.
