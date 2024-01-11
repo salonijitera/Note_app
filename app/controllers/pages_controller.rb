@@ -1,13 +1,20 @@
-
 class PagesController < ApplicationController
-  # No changes required in before_action callbacks as per the guidelines
+  skip_before_action :authenticate_user!, only: [:about]
 
   def index
     @pages = Page.all.select(:id, :name, :created_at, :updated_at)
   end
 
   def about
-    @about_content = Page.find_by(name: 'about')&.content
+    about_page = Page.find_by(name: 'about')
+    if about_page
+      render json: {
+        status: 200,
+        content: about_page.content
+      }, status: :ok
+    else
+      render json: { status: 404, error: "About page not found" }, status: :not_found
+    end
   end
 
   def show_about
