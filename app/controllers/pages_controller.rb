@@ -1,8 +1,15 @@
 class PagesController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:about]
+  before_action :authenticate_user!, except: [:about]
+  before_action :authorize_user!, only: [:index]
 
   def index
     @pages = Page.all.select(:id, :name, :created_at, :updated_at)
+    render json: {
+      status: 200,
+      pages: @pages
+    }, status: :ok
+  rescue => e
+    render json: { status: 500, error: "Internal Server Error: #{e.message}" }, status: :internal_server_error
   end
 
   def about
@@ -46,6 +53,6 @@ class PagesController < ApplicationController
 
   def authorize_user!
     # Assuming there's a method to check user authorization
-    render json: { status: 403, error: "Forbidden" }, status: :forbidden unless user_has_permission?(:view_about_page)
+    render json: { status: 403, error: "Forbidden" }, status: :forbidden unless user_has_permission?(:view_pages)
   end
 end
