@@ -1,7 +1,7 @@
 class UsersController < ApplicationController
   before_action :user_params, only: [:create]
-  before_action :set_user, only: [:edit, :update]
-  before_action :authenticate_user!, only: [:edit, :update]
+  before_action :set_user, only: [:edit, :update, :update_profile]
+  before_action :authenticate_user!, only: [:edit, :update, :update_profile]
 
   def new
     # Display the registration form
@@ -54,19 +54,38 @@ class UsersController < ApplicationController
     end
   end
 
+  def update_profile
+    unless params[:id].to_s.match?(/\A[0-9]+\z/)
+      return render json: { error: 'Invalid user ID format.' }, status: :bad_request
+    end
+
+    return render json: { error: 'User not found.' }, status: :not_found unless @user
+    return render json: { error: 'Unauthorized' }, status: :unauthorized unless current_user_can_edit?(@user)
+
+    if @user.update(user_params)
+      render json: { status: 200, user: @user.as_json(only: [:id, :name, :email, :bio, :updated_at]) }, status: :ok
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def user_params
-    params.require(:user).permit(:name, :email, :password, :password_confirmation)
+    if action_name == 'create'
+      params.require(:user).permit(:name, :email, :password, :password_confirmation)
+    elsif action_name == 'update_profile'
+      params.require(:user).permit(:name, :email, :bio)
+    end
   end
+
   def set_user
-    @user = User.find(params[:id])
+    @user = User.find_by(id: params[:id])
   end
 
   def authenticate_user!
     # Authentication logic goes here
   end
-
 
   def email_valid?(email)
     email =~ /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
@@ -74,5 +93,12 @@ class UsersController < ApplicationController
 
   def password_match?
     user_params[:password] == user_params[:password_confirmation]
+  end
+
+  def current_user_can_edit?(user)
+    # Assuming there is a method to check if the current user is the same as the user being edited
+    # or if the current user has the necessary permissions.
+    # This method needs to be implemented.
+    user == current_user || current_user.admin?
   end
 end
