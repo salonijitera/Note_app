@@ -1,5 +1,7 @@
 class PostsController < ApplicationController
-  before_action :validate_id_format, only: [:show, :update, :edit_post, :show_post]
+  before_action :validate_id_format, only: [:show, :update]
+  before_action :authenticate_user!, only: [:update_post, :create]
+  before_action :authorize_user!, only: [:update_post]
 
   def index
     page = params[:page] || 1
@@ -29,9 +31,16 @@ class PostsController < ApplicationController
   def create
     @post = Post.new(post_params.merge(created_at: Time.current, updated_at: Time.current))
     if post_params_valid? && @post.save
-      render json: { id: @post.id, title: @post.title, content: @post.content }, status: :created
+      render json: { status: 201, post: @post.as_json(include: [:user]) }, status: :created
     else
-      render json: { error: 'Validation failed', messages: @post.errors.full_messages }, status: :unprocessable_entity
+      error_status = if @post.errors.details[:title] || @post.errors.details[:content]
+                       :unprocessable_entity
+                     elsif @post.errors.details[:user_id]
+                       :bad_request
+                     else
+                       :internal_server_error
+                     end
+      render json: { error: @post.errors.full_messages }, status: error_status
     end
   end
 
@@ -44,7 +53,7 @@ class PostsController < ApplicationController
     if @post.nil?
       render json: { error: 'Post not found' }, status: :not_found
     elsif post_params_valid? && @post.update_attributes(post_params)
-      redirect_to posts_path, notice: "Post edited!!"
+      redirect_to posts_path, :notice => "Post edited!!"
     else
       render 'edit'
     end
@@ -53,19 +62,30 @@ class PostsController < ApplicationController
   def delete
     @post = Post.find(params[:id])
     @post.destroy
-    redirect_to posts_path, notice: "Post deleted!!"
+    redirect_to posts_path, :notice => "Post deleted!!"
   end
 
-  # The `edit_post` method is renamed to `show_post` to resolve the conflict
-  def show_post
+  def update_post
     @post = Post.find_by(id: params[:id])
-    if @post
-      render json: { status: 200, post: @post }, status: :ok
-    else
-      render json: { error: 'Post not found' }, status: :not_found
+    return render json: { error: "This post is not found." }, status: :not_found unless @post
+
+    unless post_update_params_valid?
+      error_messages = []
+      error_messages << "The title is required." if post_update_params[:title].blank?
+      error_messages << "You cannot input more than 200 characters." if post_update_params[:title].length > 200
+      error_messages << "The content is required." if post_update_params[:content].blank?
+      return render json: { error: error_messages.join(' ') }, status: :unprocessable_entity if error_messages.any?
     end
-  rescue StandardError => e
-    render json: { error: 'An unexpected error occurred' }, status: :internal_server_error
+
+    if @post.user_id == current_user.id || current_user.admin?
+      if @post.update(post_update_params)
+        render json: { status: 200, post: @post.as_json.merge(updated_at: @post.updated_at) }, status: :ok
+      else
+        render json: { error: @post.errors.full_messages }, status: :unprocessable_entity
+      end
+    else
+      render json: { error: "User does not have permission to update the post." }, status: :forbidden
+    end
   end
 
   def update_shop
@@ -101,6 +121,24 @@ class PostsController < ApplicationController
     false
   end
 
+  def post_update_params
+    params.require(:post).permit(:title, :content)
+  end
+
+  def post_update_params_valid?
+    title = post_update_params[:title]
+    content = post_update_params[:content]
+    title.present? && title.length <= 200 && content.present? && content.length <= 5000
+  end
+
+  def authenticate_user!
+    # Logic to authenticate user
+  end
+
+  def authorize_user!
+    # Logic to check if the current user is the owner of the post or an admin
+  end
+
   def shop_params
     params.require(:shop).permit(:name, :address)
   end
@@ -111,8 +149,6 @@ class PostsController < ApplicationController
     end
   end
 
-  # Placeholder methods for user authorization and logging
-  # These should be implemented according to your application's authorization and logging setup
   def user_can_edit_shop?(user, shop); end
   def log_shop_update(user_id, shop); end
 end
