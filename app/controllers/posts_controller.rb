@@ -6,7 +6,22 @@ class PostsController < ApplicationController
     end
 
     def show
-        @post = Post.find(params[:id])
+        # Validate that the id is an integer
+        unless params[:id].to_i.to_s == params[:id]
+            return render json: { error: 'Invalid ID format' }, status: :bad_request
+        end
+
+        # Find the post with the given id, including the associated user
+        @post = Post.includes(:user).find_by(id: params[:id])
+
+        # Check if the post was found
+        if @post
+            # Render the post along with the user data
+            render json: { post: @post, user: @post.user }
+        else
+            # Return an error message if the post was not found
+            render json: { error: 'Post not found' }, status: :not_found
+        end
     end
 
     def new
