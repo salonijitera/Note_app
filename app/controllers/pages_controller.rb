@@ -1,4 +1,3 @@
-
 class PagesController < ApplicationController
     
     def index
@@ -6,6 +5,7 @@ class PagesController < ApplicationController
     end
     
     def about
+      @about_content = Page.find_by(name: 'about')&.content
     end
 
 end
