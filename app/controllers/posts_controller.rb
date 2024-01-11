@@ -1,9 +1,14 @@
 class PostsController < ApplicationController
-  before_action :validate_id_format, only: [:show, :update]
+  before_action :validate_id_format, only: [:show, :update, :show_post]
 
   def index
-    @posts = Post.select(:id, :title, :content, :created_at, :updated_at, :user_id).all
-    render json: { status: 200, posts: @posts }
+    page = params[:page] || 1
+    per_page = params[:per_page] || 10
+
+    @posts = Post.includes(:user).page(page).per(per_page)
+    @total_posts = Post.count
+    @total_pages = (@total_posts.to_f / per_page).ceil
+    render json: { status: 200, posts: @posts, total_posts: @total_posts, total_pages: @total_pages }
   rescue => e
     render json: { error: 'Internal Server Error', message: e.message }, status: :internal_server_error
   end
@@ -49,6 +54,17 @@ class PostsController < ApplicationController
     @post = Post.find(params[:id])
     @post.destroy
     redirect_to posts_path, :notice => "Post deleted!!"
+  end
+
+  def show_post
+    @post = Post.find_by(id: params[:id])
+    if @post
+      render json: { status: 200, post: @post }, status: :ok
+    else
+      render json: { error: 'Post not found' }, status: :not_found
+    end
+  rescue StandardError => e
+    render json: { error: 'An unexpected error occurred' }, status: :internal_server_error
   end
 
   def update_shop
