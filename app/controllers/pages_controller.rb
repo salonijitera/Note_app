@@ -1,9 +1,57 @@
 class PagesController < ApplicationController
-    
-    def index
-    end
-    
-    def about
-    end
+  before_action :authenticate_user!, except: [:index] # Changed from only [:about] to except [:index] to merge the conditions
+  before_action :authorize_user!, only: [:index, :about] # Combined the authorization for both :index and :about actions
 
+  def index
+    @pages = Page.all.select(:id, :name, :created_at, :updated_at)
+    render json: {
+      status: 200,
+      pages: @pages
+    }, status: :ok
+  rescue => e
+    render json: { status: 500, error: "Internal Server Error: #{e.message}" }, status: :internal_server_error
+  end
+
+  def about
+    about_page = Page.find_by(name: 'about')
+    if about_page
+      render json: {
+        status: 200,
+        page: {
+          id: about_page.id,
+          name: about_page.name,
+          content: about_page.content,
+          created_at: about_page.created_at,
+          updated_at: about_page.updated_at
+        }
+      }, status: :ok
+    else
+      render json: { status: 404, error: "About page not found" }, status: :not_found
+    end
+  rescue => e
+    render json: { status: 500, error: "Internal Server Error: #{e.message}" }, status: :internal_server_error
+  end
+
+  # ... other actions ...
+
+  private
+
+  def authenticate_user!
+    # Assuming there's a method to check user authentication
+    render json: { status: 401, error: "Unauthorized" }, status: :unauthorized unless user_signed_in?
+  end
+
+  def authorize_user!
+    # Assuming there's a method to check user authorization
+    # Updated to check for specific permissions based on action
+    permission = case action_name
+                 when 'index'
+                   :view_pages
+                 when 'about'
+                   :view_about_page
+                 else
+                   raise "No permission set for action: #{action_name}"
+                 end
+    render json: { status: 403, error: "Forbidden" }, status: :forbidden unless user_has_permission?(permission)
+  end
 end

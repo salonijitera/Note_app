@@ -1,5 +1,7 @@
 class Post < ApplicationRecord
-    validates :title, :content, :presence => true
-    validates :title, :content, :length => { :minimum => 4 }
-    validates :title, :content, :uniqueness => { :message => "already taken!!" }
+  belongs_to :user
+  has_many :comments, dependent: :destroy
+
+  validates :title, presence: true, length: { minimum: 4 }, uniqueness: { message: "already taken!!" }
+  validates :content, presence: true, length: { minimum: 4 }
 end
