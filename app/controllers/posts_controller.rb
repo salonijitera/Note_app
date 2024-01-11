@@ -1,5 +1,5 @@
 class PostsController < ApplicationController
-  before_action :validate_id_format, only: [:update]
+  before_action :validate_id_format, only: [:show, :update]
 
   def index
     page = params[:page] || 1
@@ -11,15 +11,11 @@ class PostsController < ApplicationController
   end
 
   def show
-    unless params[:id].to_s.match?(/\A\d+\z/)
-      render json: { error: 'Invalid ID format' }, status: :bad_request
+    @post = Post.includes(:user).find_by(id: params[:id])
+    if @post
+      render json: { post: @post, user: @post.user }
     else
-      @post = Post.includes(:user).find_by(id: params[:id])
-      if @post
-        render json: { post: @post, user: @post.user }
-      else
-        render json: { error: 'Post not found' }, status: :not_found
-      end
+      render json: { error: 'Post not found' }, status: :not_found
     end
   end
 
@@ -28,11 +24,11 @@ class PostsController < ApplicationController
   end
 
   def create
-    @post = Post.new(post_params)
-    if @post.save
-      redirect_to posts_path, :notice => "Post created!!"
+    @post = Post.new(post_params.merge(created_at: Time.current, updated_at: Time.current))
+    if post_params_valid? && @post.save
+      render json: { id: @post.id, title: @post.title, content: @post.content }, status: :created
     else
-      render 'new'
+      render json: { error: 'Validation failed', messages: @post.errors.full_messages }, status: :unprocessable_entity
     end
   end
 
@@ -44,10 +40,10 @@ class PostsController < ApplicationController
     @post = Post.find_by_id(params[:id])
     if @post.nil?
       render json: { error: 'Post not found' }, status: :not_found
-    elsif @post.update_attributes(post_params)
+    elsif post_params_valid? && @post.update_attributes(post_params)
       redirect_to posts_path, :notice => "Post edited!!"
     else
-      render json: { errors: @post.errors.full_messages }, status: :unprocessable_entity
+      render 'edit'
     end
   end
 
@@ -75,12 +71,23 @@ class PostsController < ApplicationController
 
   private
 
-  def shop_params
-    params.require(:shop).permit(:name, :address)
+  def post_params_valid?
+    required_params = %i[title content user_id]
+    required_params.all? { |param| post_params[param].present? } && User.exists?(post_params[:user_id])
   end
 
   def post_params
-    params.require(:post).permit(:title, :content)
+    params.require(:post).permit(:title, :content, :user_id)
+  rescue ActionController::ParameterMissing => e
+    render json: { error: e.message }, status: :bad_request
+    false
+  rescue StandardError => e
+    render json: { error: 'An unexpected error occurred' }, status: :internal_server_error
+    false
+  end
+
+  def shop_params
+    params.require(:shop).permit(:name, :address)
   end
 
   def validate_id_format
