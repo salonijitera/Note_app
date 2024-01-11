@@ -1,6 +1,6 @@
 class PagesController < ApplicationController
-  before_action :authenticate_user!, except: [:about]
-  before_action :authorize_user!, only: [:index]
+  before_action :authenticate_user!, except: [:index] # Changed from only [:about] to except [:index] to merge the conditions
+  before_action :authorize_user!, only: [:index, :about] # Combined the authorization for both :index and :about actions
 
   def index
     @pages = Page.all.select(:id, :name, :created_at, :updated_at)
@@ -13,18 +13,6 @@ class PagesController < ApplicationController
   end
 
   def about
-    about_page = Page.find_by(name: 'about')
-    if about_page
-      render json: {
-        status: 200,
-        content: about_page.content
-      }, status: :ok
-    else
-      render json: { status: 404, error: "About page not found" }, status: :not_found
-    end
-  end
-
-  def show_about
     about_page = Page.find_by(name: 'about')
     if about_page
       render json: {
@@ -44,6 +32,8 @@ class PagesController < ApplicationController
     render json: { status: 500, error: "Internal Server Error: #{e.message}" }, status: :internal_server_error
   end
 
+  # ... other actions ...
+
   private
 
   def authenticate_user!
@@ -53,6 +43,15 @@ class PagesController < ApplicationController
 
   def authorize_user!
     # Assuming there's a method to check user authorization
-    render json: { status: 403, error: "Forbidden" }, status: :forbidden unless user_has_permission?(:view_pages)
+    # Updated to check for specific permissions based on action
+    permission = case action_name
+                 when 'index'
+                   :view_pages
+                 when 'about'
+                   :view_about_page
+                 else
+                   raise "No permission set for action: #{action_name}"
+                 end
+    render json: { status: 403, error: "Forbidden" }, status: :forbidden unless user_has_permission?(permission)
   end
 end
